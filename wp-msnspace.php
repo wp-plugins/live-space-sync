@@ -4,7 +4,7 @@ Plugin Name: MSN Space Sync 2
 Plugin URI: http://priv.tw/blog/msn-sync-modified/
 Description: A MSN rpc plug-in
 Author: William, priv
-Version: 2.0
+Version: 2.1
 Author URI: http://priv.tw/blog/
 */
 ?>
@@ -17,6 +17,7 @@ $WP_MSNSYNC_MSG;
 $WP_MSNSYNC_TITLE;
 $WP_MSNSYNC_COOK;
 $WP_MSNSYNC_PUBLISH;
+$WP_MSNSYNC_DELETE;
 
 //////////////////////////////////////////////////////////////
 //Main code section 
@@ -27,6 +28,7 @@ function wp_msnsync_init(){
 	add_option("wp_msnsync_enable", '1');
 	add_option("wp_msnsync_cook", '1');
 	add_option("wp_msnsync_publish", '1');
+	add_option("wp_msnsync_delete", '1');
 	add_option("wp_msnsync_msg",  '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST]');
 	add_option("wp_msnsync_title",  '[TITLE]');
 	add_option("wp_msnsync_id", '');
@@ -39,6 +41,7 @@ function wp_msnsync_save(){
 	update_option("wp_msnsync_enable", $_POST['ENABLE']);
 	update_option("wp_msnsync_cook", $_POST['COOK']);
 	update_option("wp_msnsync_publish", $_POST['PUBLISH']);
+	update_option("wp_msnsync_delete", $_POST['DELETE']);
 	update_option("wp_msnsync_msg",  stripslashes($_POST['SYNCMSG']));
 	update_option("wp_msnsync_title",  stripslashes($_POST['TITLE']));
 }
@@ -47,6 +50,7 @@ function wp_msnsync_reset(){
 	update_option("wp_msnsync_enable", '1');
 	update_option("wp_msnsync_cook", '1');
 	update_option("wp_msnsync_publish", '1');
+	update_option("wp_msnsync_delete", '1');
 	update_option("wp_msnsync_msg",  '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST]');
 	update_option("wp_msnsync_title",  '[TITLE]');
 }
@@ -298,9 +302,37 @@ function wp_msnsync_post($postid){
 	return $postid;
 }
 
+/*Delete hook*/
+function wp_msnsync_delete($postid){
+	$WP_MSNSYNC_ENABLE=get_option("wp_msnsync_enable");
+	$WP_MSNSYNC_DELETE=get_option("wp_msnsync_delete");
+	$WP_MSNSYNC_IDS=get_option("wp_msnsync_id");
+	$WP_MSNSYNC_URL=get_option("wp_msnsync_url");
+	$WP_MSNSYNC_PASSWORD=get_option("wp_msnsync_password");
+
+	if($WP_MSNSYNC_ENABLE=="1"&&$WP_MSNSYNC_DELETE=="1"&&$WP_MSNSYNC_IDS[$postid])
+	{
+    $request="<methodCall>
+    <methodName>blogger.deletePost</methodName>
+    <params>
+    <param><value><string>ignored value</string></value></param>
+    <param><value><string>".$WP_MSNSYNC_IDS[$postid]."</string></value></param>
+    <param><value><string>".$WP_MSNSYNC_URL."</string></value></param>
+    <param><value><string>".$WP_MSNSYNC_PASSWORD."</string></value></param>
+    <param><value><boolean>1</boolean></value></param>
+    </params>
+    </methodCall>";
+    
+    $result=wp_msnsync_docall($request);
+	}
+	unset($WP_MSNSYNC_IDS[$postid]);
+  update_option("wp_msnsync_id", $WP_MSNSYNC_IDS);
+	
+	return $postid;
+}
+
 //if first run, initialize the options
-if (!(get_option('wp_msnsync_enable')))
-	wp_msnsync_init();
+wp_msnsync_init();
 
 /*main action function*/
 function wp_msnsync_display(){
@@ -323,6 +355,7 @@ global $WP_MSNSYNC_MSG;
 global $WP_MSNSYNC_TITLE;
 global $WP_MSNSYNC_COOK;
 global $WP_MSNSYNC_PUBLISH;
+global $WP_MSNSYNC_DELETE;
 
 $WP_MSNSYNC_PASSWORD=get_option("wp_msnsync_password");
 $WP_MSNSYNC_URL=get_option("wp_msnsync_url");
@@ -331,6 +364,7 @@ $WP_MSNSYNC_MSG=get_option("wp_msnsync_msg");
 $WP_MSNSYNC_TITLE=get_option("wp_msnsync_title");
 $WP_MSNSYNC_COOK=get_option("wp_msnsync_cook");
 $WP_MSNSYNC_PUBLISH=get_option("wp_msnsync_publish");
+$WP_MSNSYNC_DELETE=get_option("wp_msnsync_delete");
 
 //get info
 $response=wp_msnsync_getinfo();
@@ -366,39 +400,32 @@ $response=wp_msnsync_getinfo();
 	<th scope="row">Password:</th><td> <input name="PASS" type="text" size="60" value="<?php echo  $WP_MSNSYNC_PASSWORD;?>"/><br />This is the secret word you choosed in your MSN space</td></tr>
 	<tr valign="top">
 	<th scope="row">Enable Sync: </th><td>
-	<?php if($WP_MSNSYNC_ENABLE=="1"){?>
-	  <label><input type="radio" name="ENABLE" value="1" checked/>Yes</label>
-	  <label><input type="radio" name="ENABLE" value="0" />No</label>
-	  <?php }else{ ?>
-  	  <label><input type="radio" name="ENABLE" value="1" />Yes</label>
-	  <label><input type="radio" name="ENABLE" value="0" checked/>No</label>
-	  <?php } ?>
+	  <label><input type="radio" name="ENABLE" value="1" <?php echo $WP_MSNSYNC_ENABLE?'checked':''; ?>/>Yes</label>
+	  <label><input type="radio" name="ENABLE" value="0" <?php echo $WP_MSNSYNC_ENABLE?'':'checked'; ?>/>No</label>
 	  <br />When set to "Yes", there will be a new post made to your msn space whenever you make a new publishing
 		</td>
 		</tr>
 		<!-- -->
 	<tr valign="top">
+	<th scope="row">Sync Delete: </th><td>
+	  <label><input type="radio" name="DELETE" value="1" <?php echo $WP_MSNSYNC_DELETE?'checked':''; ?>/>Yes</label>
+	  <label><input type="radio" name="DELETE" value="0" <?php echo $WP_MSNSYNC_DELETE?'':'checked'; ?>/>No</label>
+	  <br />When delete post, delete post on Live Spaces as well(will be inactive when Enable Sync set to No).
+		</td>
+		</tr>
+		<!-- -->
+	<tr valign="top">
 	<th scope="row">Post Status: </th><td>
-	<?php if($WP_MSNSYNC_PUBLISH=="1"){?>
-	  <label><input type="radio" name="PUBLISH" value="1" checked/>Published</label>
-	  <label><input type="radio" name="PUBLISH" value="0" />Draft</label>
-	  <?php }else{ ?>
-  	  <label><input type="radio" name="PUBLISH" value="1" />Published</label>
-	  <label><input type="radio" name="PUBLISH" value="0" checked/>Draft</label>
-	  <?php } ?>
+	  <label><input type="radio" name="PUBLISH" value="1" <?php echo $WP_MSNSYNC_PUBLISH?'checked':''; ?>/>Published</label>
+	  <label><input type="radio" name="PUBLISH" value="0" <?php echo $WP_MSNSYNC_PUBLISH?'':'checked'; ?>/>Draft</label>
 	  <br />Set the status that the synchronized post will appear in MSN spaces.
 		</td>
 		</tr>
 		<!-- -->
 	<tr valign="top">
 	<th scope="row">Enable Cook: </th><td>
-	<?php if($WP_MSNSYNC_COOK=="1"){?>
-	  <label><input type="radio" name="COOK" value="1" checked/>Yes</label>
-	  <label><input type="radio" name="COOK" value="0" />No</label>
-	  <?php }else{ ?>
-  	  <label><input type="radio" name="COOK" value="1" />Yes</label>
-	  <label><input type="radio" name="COOK" value="0" checked/>No</label>
-	  <?php } ?>
+	  <label><input type="radio" name="COOK" value="1" <?php echo $WP_MSNSYNC_COOK?'checked':''; ?>/>Yes</label>
+	  <label><input type="radio" name="COOK" value="0" <?php echo $WP_MSNSYNC_COOK?'':'checked'; ?>/>No</label>
 	  <br />When set to "Yes", convert "&lt;p&gt;" tags to "&lt;div&gt;" formatters, to be better viewed with live spaces.
 		</td>
 		</tr>
@@ -435,5 +462,6 @@ function wp_msnsync_add_page($s){
 }
 add_action('admin_menu','wp_msnsync_add_page');
 add_action('publish_post','wp_msnsync_post');
+add_action('delete_post','wp_msnsync_delete');
 
 ?>
