@@ -1,0 +1,9 @@
+1.0	Major update.Added support for post digest
+0.95	Added support for HTML in message
+0.9	Internal beta test version, there was no public release
+0.8	Major update. Self contained function to generate XML-RPC call
+	instead using the experimental function from PHP which many people
+	does not have at the moment.
+0.7	Support for uni-code. Support for multiple languages from now on
+0.6	Fixed minor problem in code
+0.5	First Alpha version of MSN Sync
