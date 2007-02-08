@@ -1,22 +1,8 @@
-Hello all.
-Are you jealousy about your friends having all the viewer with their msn spaces since they have that "shining star"?
-Here is a plug-in for you to help you send a synchronization signal to your msn space, so that the star will flashing.
-I recommand you to include your blogs URL in the synchronization message. For version 1.0, this plug-in will include a digest of the new posting you made on your blog. But for now,(before my finals) let's just leave it as the way it is
+Sorry I'm lazy creating the offline documents, please visit my blog.
 
 
-Installation note:
-STEP 1. 
-Enable your msn space for API posting.
-Setup a MSN space if you don't have one.
-Then goto options --> E-mail publishing
-Under this menu, choose an e-mail (This doesn't matter)
-Then choose a secret word (This will be the "password")
+English installation guide:
+http://privism.org/blog/live-sync/
 
-STEP 2.
-Place the wp-msnspace.php into [wp-content/plugins] directory then simply activate it from your control panel.
-
-STEP 3.
-Go to admin panel, you'll see a new option called "msn sync", go in there and make the necessary setup, and you're done.
-
-If you have any questions, please direct them to 2bethere@gmail.com
-1
+Chinese installation guide:
+http://priv.tw/blog/msn-sync-modified/

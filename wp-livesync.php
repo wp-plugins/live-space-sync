@@ -1,11 +1,11 @@
 <?php
 /*
-Plugin Name: MSN Space Sync 2
-Plugin URI: http://priv.tw/blog/msn-sync-modified/
-Description: A MSN rpc plug-in
+Plugin Name: Live Space Sync
+Plugin URI: http://privism.org/blog/live-sync/
+Description: A Live Spaces rpc plug-in
 Author: William, priv
-Version: 2.3b3
-Author URI: http://priv.tw/blog/
+Version: 1.0
+Author URI: http://privism.org/blog/
 */
 ?>
 <?php
@@ -20,6 +20,7 @@ $WP_MSNSYNC_COOK;
 $WP_MSNSYNC_PUBLISH;
 $WP_MSNSYNC_DELETE;
 $WP_MSNSYNC_FULL;
+$WP_MSNSYNC_EXCLUDE;
 
 //////////////////////////////////////////////////////////////
 //Main code section
@@ -34,15 +35,15 @@ function wp_msnsync_init(){
 	add_option("wp_msnsync_full", '1');
 	add_option("wp_msnsync_msg",  '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST]');
 	add_option("wp_msnsync_title",  '[TITLE]');
-	add_option("wp_msnsync_more", '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST]<a href=[PERMALINK] title="[TITLE]">read full story of "[TITLE]">></a>');
+	add_option("wp_msnsync_more", '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST]<div><a href=[PERMALINK] title="[TITLE]">read full story of "[TITLE]"&raquo;</a></div>');
 	add_option("wp_msnsync_id", '');
+	add_option("wp_msnsync_exclude", '');
 }
 
 function wp_msnsync_save(){
 	//save options into databse
 	update_option("wp_msnsync_url", $_POST['URL']);
 	update_option("wp_msnsync_password", $_POST['PASS']);
-	update_option("wp_msnsync_enable", $_POST['ENABLE']);
 	update_option("wp_msnsync_cook", $_POST['COOK']);
 	update_option("wp_msnsync_publish", $_POST['PUBLISH']);
 	update_option("wp_msnsync_delete", $_POST['DELETE']);
@@ -50,6 +51,15 @@ function wp_msnsync_save(){
 	update_option("wp_msnsync_msg",  stripslashes($_POST['SYNCMSG']));
 	update_option("wp_msnsync_title",  stripslashes($_POST['TITLE']));
 	update_option("wp_msnsync_more", stripslashes($_POST['MOREMSG']));
+	update_option('wp_msnsync_exclude',$_POST['exclude_category']);
+}
+
+//Toogle post sync enable
+function wp_msnsync_enable(){
+  $WP_MSNSYNC_ENABLE=get_option("wp_msnsync_enable");
+  $WP_MSNSYNC_ENABLE=$WP_MSNSYNC_ENABLE?0:1;
+  update_option("wp_msnsync_enable", $WP_MSNSYNC_ENABLE);
+  return $WP_MSNSYNC_ENABLE;
 }
 
 function wp_msnsync_reset(){
@@ -60,7 +70,8 @@ function wp_msnsync_reset(){
 	update_option("wp_msnsync_full", '1');
 	update_option("wp_msnsync_msg",  '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST]');
 	update_option("wp_msnsync_title",  '[TITLE]');
-	update_option("wp_msnsync_more", '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST] <a href=[PERMALINK] title="[TITLE]">read full story of "[TITLE]">></a>');
+	update_option("wp_msnsync_more", '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST] <div><a href=[PERMALINK] title="[TITLE]">read full story of "[TITLE]"&raquo;</a></div>');
+	update_option("wp_msnsync_exclude", '');
 }
 
 /* XML RPC Client*/
@@ -86,33 +97,25 @@ function wp_msnsync_docall($request){
 		$headers .= "$str\n";
 	}while($str!="");
 
-
 	/*parse the header for content length*/
 	$header_temp=split("\n",$headers);
 	foreach($header_temp as $value){
 		$temp=split(":",$value);
 		$header_array[$temp[0]]=$temp[1];
 	}
+	$body ="";
 	if(isset($header_array['Content-Length'])){
 	//if size exist
 		$size=0 + substr($header_array['Content-Length'],1);
-		$body = fread($fp,$size);
+		if($size > 0)
+		  $body = fread($fp,$size);
 	}else{
-		$body="";
 		while (!feof($fp)) {
 			$line.= fgets($fp);
-
 		}
 	}
-
 	return $body;
 	}
-
-}
-
-/*time generating function*/
-function ig_iso8601_time($post){
-	return (mysql2date('Y-m-d\TH:i:s\Z', $post->post_date_gmt, false));
 }
 
 /* Update status on the user space*/
@@ -242,9 +245,9 @@ $output="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
      </value>
     </member>
     <member>
-     <name>dateTime.iso8601</name>
+     <name>dateCreated</name>
      <value>
-      <string>".ig_iso8601_time($user_data)."</string>
+      <dateTime.iso8601>".mysql2date('Y-m-d\TH:i:s\Z', $user_data->post_date_gmt, false)."</dateTime.iso8601>
      </value>
     </member>
     <member>
@@ -272,6 +275,7 @@ $output="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 /*Publishing hook*/
 function wp_msnsync_post($postid){
 	$WP_MSNSYNC_ENABLE=get_option("wp_msnsync_enable");
+	$WP_MSNSYNC_EXCLUDE = get_option("wp_msnsync_exclude");
 
 	if($WP_MSNSYNC_ENABLE=="1")
 	{//enable
@@ -279,7 +283,14 @@ function wp_msnsync_post($postid){
 	  //retreive the post content
 	  $user_data=get_post($postid);
 
-		//if contains <!--Stop Sync--> tag, don't sync this post
+		//excluded categries
+	  $categories = get_the_category($postid);
+	  foreach ($categories as $category) {
+	  	if ($WP_MSNSYNC_EXCLUDE && in_array($category->cat_ID,$WP_MSNSYNC_EXCLUDE))
+	  		return $postid;
+	  }
+
+		//if contains <!--stopsync--> tag, don't sync this post
 		if(strpos($user_data->post_content, '<!--stopsync-->') !== false)
 		    return $postid;
 
@@ -306,11 +317,13 @@ function wp_msnsync_post($postid){
 			}
 			//TODO, if other fail, how to tell user sync is fail??
 		}
-		//save postid
-		if(preg_match('%<value>(.*)</value>%', $result, $match))
-		{
-			$WP_MSNSYNC_IDS[$postid]=$match[1];
-			update_option("wp_msnsync_id", $WP_MSNSYNC_IDS);
+		//save postid if first try or second try success
+		if(strpos($result, 'faultCode') === false){
+		  if(preg_match('%<value>(.*)</value>%', $result, $match))
+		  {
+		    $WP_MSNSYNC_IDS[$postid]=$match[1];
+		    update_option("wp_msnsync_id", $WP_MSNSYNC_IDS);
+		  }
 		}
 	}
 	return $postid;
@@ -345,6 +358,14 @@ function wp_msnsync_delete($postid){
 	return $postid;
 }
 
+function wp_msnsync_syncall(){
+  global $wpdb;
+  $posts = $wpdb->get_results("SELECT ID FROM $wpdb->posts WHERE post_status = 'publish' AND post_type='post' ORDER BY post_date");
+  if($posts)
+    foreach ($posts as $post)
+      wp_msnsync_post($post->ID);
+}
+
 //if first run, initialize the options
 wp_msnsync_init();
 
@@ -352,7 +373,13 @@ wp_msnsync_init();
 function wp_msnsync_display(){
 
 /*First, check action*/
-if(isset($_POST['reset'])){
+if(isset($_POST['syncall'])){
+  wp_msnsync_syncall();
+}
+else if(isset($_POST['enablebutton'])){
+  wp_msnsync_enable();
+}
+else if(isset($_POST['reset'])){
 	wp_msnsync_reset();
 	echo '<div id="message" class="updated fade"><p>Options reseted.</p></div>';
 }
@@ -372,6 +399,8 @@ global $WP_MSNSYNC_PUBLISH;
 global $WP_MSNSYNC_DELETE;
 global $WP_MSNSYNC_FULL;
 global $WP_MSNSYNC_MORE;
+global $WP_MSNSYNC_EXCLUDE;
+global $wpdb;
 
 $WP_MSNSYNC_PASSWORD=get_option("wp_msnsync_password");
 $WP_MSNSYNC_URL=get_option("wp_msnsync_url");
@@ -383,13 +412,16 @@ $WP_MSNSYNC_PUBLISH=get_option("wp_msnsync_publish");
 $WP_MSNSYNC_DELETE=get_option("wp_msnsync_delete");
 $WP_MSNSYNC_FULL=get_option("wp_msnsync_full");
 $WP_MSNSYNC_MORE=get_option("wp_msnsync_more");
+$WP_MSNSYNC_EXCLUDE = get_option("wp_msnsync_exclude");
+$categories = $wpdb->get_results("SELECT * FROM $wpdb->categories ORDER BY cat_name");
 
 //get info
 $response=wp_msnsync_getinfo();
 
 ?>
 <div class="wrap">
-	<h2>MSN Sync</h2>
+	<h2>Live Sync</h2>
+
 	<?php
 	if(isset($response['faultCode'])){
 	//this means there is an error
@@ -404,6 +436,7 @@ $response=wp_msnsync_getinfo();
 	?>
 	<div class="wrap">
 	Your Space: <a href="<?php echo $response['url'];?>"><?php echo $response['blogName']." ( ".$response['blogid']." )";?></a>
+	<br />Seems your settings are correct, <?php echo $WP_MSNSYNC_ENABLE?'and the plug-in is ready to sync post for you.':'but your post sync is disabled.'?>
 	</div>
 	<?php
 	}//if there is no error?>
@@ -411,18 +444,15 @@ $response=wp_msnsync_getinfo();
 	<form name="msnoptions" method="post" action="<?php echo $_SERVER["REQUEST_URI"]?>">
 	<table class="optiontable">
 	<tbody>
+	<tr><th><h2>Connections:</h2></th></tr>
+	 <tr><th>Post sync is <?php echo $WP_MSNSYNC_ENABLE?'Enabled':'Disabled'?></th>
+	  <td><input type="submit" name="enablebutton" value="<?php echo $WP_MSNSYNC_ENABLE?'Disable it':'Enable it'?>" /></td>
+	</tr>
 	<tr valign="top">
 	<th scope="row">Space Name:</th><td><input name="URL" type="text" size="60" value="<?php echo  $WP_MSNSYNC_URL;?>" /><br />Make sure you enter the space name, not the URL.<br />e.g. "http://abcd.spaces.live.com" should enter "abcd"</td>
 	</tr>
 	<tr valign="top">
 	<th scope="row">Password:</th><td> <input name="PASS" type="text" size="60" value="<?php echo  $WP_MSNSYNC_PASSWORD;?>"/><br />This is the secret word you choosed in your MSN space</td></tr>
-	<tr valign="top">
-	<th scope="row">Enable Sync: </th><td>
-	  <label><input type="radio" name="ENABLE" value="1" <?php echo $WP_MSNSYNC_ENABLE?'checked="checked"':''; ?>/>Yes</label>
-	  <label><input type="radio" name="ENABLE" value="0" <?php echo $WP_MSNSYNC_ENABLE?'':'checked="checked"'; ?>/>No</label>
-	  <br />When set to "Yes", there will be a new post made to your msn space whenever you make a new publishing
-		</td>
-		</tr>
 		<!-- -->
 	<tr valign="top">
 	<th scope="row">Sync Delete: </th><td>
@@ -440,8 +470,9 @@ $response=wp_msnsync_getinfo();
 		</td>
 		</tr>
 		<!-- -->
+	<tr><th><h2>Formatting</h2></th></tr>
 	<tr valign="top">
-	<th scope="row">Sync Full Text: </th><td>
+	<th scope="row">Sync Text: </th><td>
 	  <label><input type="radio" name="FULL" value="1" <?php echo $WP_MSNSYNC_FULL?'checked="checked"':''; ?>/>Always Full Text</label>
 	  <label><input type="radio" name="FULL" value="0" <?php echo $WP_MSNSYNC_FULL?'':'checked="checked"'; ?>/>Cut at &lt;!--more--&gt;</label>
 	  <br />Always synchronize full text, or cut at &lt;!--more--&gt;
@@ -465,32 +496,47 @@ $response=wp_msnsync_getinfo();
   </th>
   <td>
 	  <textarea name="SYNCMSG" cols="60" rows="4"><?php echo htmlspecialchars($WP_MSNSYNC_MSG);?></textarea>
-
+		<br /> This will be the content of sync when fulltext is synchronized.
 	  </td>
 	  </tr>
 	  	<tr valign="top">
-	<th scope="row">Content of Sync<br/>(Partial Article Ver.):</th><td>
+	<th scope="row">Content of Sync<br/>(For Partial Article):</th><td>
 		<textarea name="MOREMSG" cols="60" rows="4"><?php echo htmlspecialchars($WP_MSNSYNC_MORE);?></textarea>
-		<br /> This will be the content of sync when the artcile is cut by &lt;!--more--&gt; and 'Sync Full Text' set to 'Cut at &lt;!--more--&gt;'
+		<br /> This will be the content of sync when 'Sync Text' is set to 'Cut at &lt;!--more--&gt;' and the article contains &lt;!--more--&gt;.
 		</td></tr>
 	  </tbody>
 	  </table>
 	  	  <div class="wrap">Tips: You can use <font color="#7799FF">[TITLE]</font>/<font color="#7799FF">[POST]</font>/<font color="#7799FF">[PERMALINK]</font> in "Title of Sync" and "Content of Sync".<br />
-	  They will be replaced by the <font color="#7799FF">Title</font>, <font color="#7799FF">content</font>, or <font color="#7799FF">permalink</font> of your post<br />
+	  They will be replaced by the <font color="#7799FF">title</font>, <font color="#7799FF">content</font>, or <font color="#7799FF">permalink</font> of your post<br />
 	  If you don't want a single post to be synced, add &lt;!--stopsync--&gt; in that article.
 	  </div>
+	  <div class="wrap">
+	  <h2>Excluded Categories</h2>
+	  Select the categories that you don't want them to be synchronized.<br/>
+	  <?php
+	  if ($categories)
+		foreach ($categories as $category) {
+			$checked = '';
+			if ($WP_MSNSYNC_EXCLUDE && in_array($category->cat_ID,$WP_MSNSYNC_EXCLUDE)) {
+				$checked = 'checked="checked" ';
+			}
+			echo "<label>";
+			echo "<input name=\"exclude_category[]\" type=\"checkbox\" value=\"$category->cat_ID\" $checked/>";
+			echo " $category->cat_name</label><br />\n";
+		}?>
+	</div>
 	<input type="hidden" name="action" value="options" />
-	<p class="submit"><input name="reset" value="Reset Options" type="submit"/><input value="Update Options" type="submit"/></p>
+	<p class="submit"><input name="syncall" value="Sync All existing Posts" type="submit"/><input name="reset" value="Restore Default Options" type="submit"/><input value="Update Options" type="submit"/></p>
 	</form>
-	<div class="wrap" align="right">This plug-in is created by <a href="http://blog.12thocean.com/">William Xu</a> and Modified by <a href="http://priv.tw/blog">priv</a>.</div>
+	<div class="wrap" align="right">This plug-in was originally created by <a href="http://blog.12thocean.com/">William Xu</a> and heavily modified by <a href="http://priv.tw/blog">priv</a>.</div>
 </div>
 
 <?php
 }
 
 function wp_msnsync_add_page($s){
-	add_submenu_page('post.php', 'MSN Sync','MSN Sync',1,__FILE__,'wp_msnsync_display');
-	add_options_page('MSN Sync', 'MSN Sync',1,__FILE__,'wp_msnsync_display');
+	add_submenu_page('post.php', 'Live Sync','Live Sync',1,__FILE__,'wp_msnsync_display');
+	add_options_page('Live Sync', 'Live Sync',1,__FILE__,'wp_msnsync_display');
 	return $s;
 }
 add_action('admin_menu','wp_msnsync_add_page');

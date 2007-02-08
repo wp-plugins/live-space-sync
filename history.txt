@@ -1,3 +1,45 @@
+Live Sync 1.0
+
+ New:
+  * Add exclude catgories option
+  * Sync-all-posts-at-once button
+ Changes:
+  * Change Name to Live Sync
+  * Change UI
+ Fix:
+  * fix plug-in page xhtml 1.0 validate
+  * fix time generation
+
+--
+2.3Beta
+Fix:
+  * Fix <!--more--> support
+
+2.2
+New:
+  * Support cut at <!--more-->(broken)
+
+2.1
+ New:
+  * Sync 'delete post' action
+
+2.0
+ New:
+  * Remember sync id, now you can synchronizedly edit existing posts.
+  * Add permalink digest.
+ Changes:
+  * No longer depends php built-in XML-RPC
+
+1.0p First MSN Modified version
+ New:
+  * Init options
+  * Post Status selection
+  * Apply post filter for better formatting
+  * Add option to replace <p></p> to <div></div><br/>, better MSN Space formatting
+ Fix:
+  * fix htmlspecialchars for broken '&'
+
+--
 1.0	Major update.Added support for post digest
 0.95	Added support for HTML in message
 0.9	Internal beta test version, there was no public release
