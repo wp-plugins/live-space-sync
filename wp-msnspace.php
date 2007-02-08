@@ -1,22 +1,15 @@
 <?php
 /*
-Plugin Name: MSN Space Sync
-Plugin URI: http://priv.tw/blog/
+Plugin Name: MSN Space Sync 2
+Plugin URI: http://priv.tw/blog/msn-sync-modified/
 Description: A MSN rpc plug-in
 Author: William, priv
-Version: 1.0p2
-Author URI: http://moonblue.homeip.net
+Version: 2.0
+Author URI: http://priv.tw/blog/
 */
 ?>
-<?php	
+<?php
 
-//before the world starts, check functions
-$extension_array=get_loaded_extensions();
-if(($array_key=array_search('xmlrpc',$extension_array))!=NULL){
-	$RPC_VERSION=1;
-}else{
-	$RPC_VERSION=-1;
-}
 $WP_MSNSYNC_PASSWORD;
 $WP_MSNSYNC_URL;
 $WP_MSNSYNC_ENABLE;
@@ -25,89 +18,192 @@ $WP_MSNSYNC_TITLE;
 $WP_MSNSYNC_COOK;
 $WP_MSNSYNC_PUBLISH;
 
-//initialize the options
-if (!(get_option('wp_msnsync_enable'))) {
+//////////////////////////////////////////////////////////////
+//Main code section 
+//////////////////////////////////////////////////////////////
+function wp_msnsync_init(){
 	add_option("wp_msnsync_url", 'fill-in-you-space-name');
 	add_option("wp_msnsync_password", 'fill-in-your-password');
 	add_option("wp_msnsync_enable", '1');
 	add_option("wp_msnsync_cook", '1');
 	add_option("wp_msnsync_publish", '1');
-	add_option("wp_msnsync_msg",  '[POST]');
+	add_option("wp_msnsync_msg",  '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST]');
 	add_option("wp_msnsync_title",  '[TITLE]');
+	add_option("wp_msnsync_id", '');
 }
 
-/*Publishing hook*/
-function wp_msnsync_post($input){
-	//$input is the post id
-	$data=get_post($input);
-	//those two are some aviable data sets
-	//$data->post_content;
-	//$data->post_title;
+function wp_msnsync_save(){
+	//save options into databse
+	update_option("wp_msnsync_url", $_POST['URL']);
+	update_option("wp_msnsync_password", $_POST['PASS']);
+	update_option("wp_msnsync_enable", $_POST['ENABLE']);
+	update_option("wp_msnsync_cook", $_POST['COOK']);
+	update_option("wp_msnsync_publish", $_POST['PUBLISH']);
+	update_option("wp_msnsync_msg",  stripslashes($_POST['SYNCMSG']));
+	update_option("wp_msnsync_title",  stripslashes($_POST['TITLE']));
+}
 
+function wp_msnsync_reset(){
+	update_option("wp_msnsync_enable", '1');
+	update_option("wp_msnsync_cook", '1');
+	update_option("wp_msnsync_publish", '1');
+	update_option("wp_msnsync_msg",  '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST]');
+	update_option("wp_msnsync_title",  '[TITLE]');
+}
+
+/* XML RPC Client*/
+function wp_msnsync_docall($request){
+	$fp = fsockopen("ssl://storage.msn.com", 443, $errno, $errstr);
+	if (!$fp) {
+	  $hd=@fopen("temp.txt",'a');
+	fwrite($hd,"Failed");
+	fclose($hd);
+	} else {
+	$data="";
+	$data.="POST /storageservice/MetaWeblog.rpc  HTTP/1.1\r\n";
+	$data.="Host: storage.msn.com\r\n";
+	$data.="Content-Type: text/xml\r\n";
+	$data.="Content-Length: ".strlen($request)."\r\n";
+	$data.="Accept: */*\r\n\r\n";
+	$data.="$request\r\n\r\n";
 	//
-	$WP_MSNSYNC_ENABLE=get_option("wp_msnsync_enable");
-	if($WP_MSNSYNC_ENABLE=="1"){//enable
-	$request=wp_msnsync_genpost($data);
-	$result=wp_msnsync_docall($request);
-
-	}else{
-	//do nothing
+	fwrite($fp,$data);
+	//
+	
+	$headers = "";
+	do{
+		$str = trim(fgets($fp, 128));
+		$headers .= "$str\n";
+	}while($str!="");
+	
+	
+	/*parse the header for content length*/
+	$header_temp=split("\n",$headers);
+	foreach($header_temp as $value){
+		$temp=split(":",$value);
+		$header_array[$temp[0]]=$temp[1];
 	}
-	return $input;
+	if(isset($header_array['Content-Length'])){
+	//if size exist
+		$size=0 + substr($header_array['Content-Length'],1);
+		$body = fread($fp,$size);
+	}else{
+		$body="";
+		while (!feof($fp)) {
+			$line.= fgets($fp);
+
+		} 
+	}
+ 
+	return $body;
+	}
+
 }
 
-function wp_msnsync_genpost($user_data){
+/*time generating function*/
+function ig_iso8601_time($utc=true){
+        $datestr = date('Y-m-d\TH:i:sO');
+        if($utc){
+                $eregStr =
+                '([0-9]{4})-'.        // centuries & years CCYY-
+                '([0-9]{2})-'.        // months MM-
+                '([0-9]{2})'.        // days DD
+                'T'.                        // separator T
+                '([0-9]{2}):'.        // hours hh:
+                '([0-9]{2}):'.        // minutes mm:
+                '([0-9]{2})(\.[0-9]*)?'. // seconds ss.ss...
+                '(Z|[+\-][0-9]{2}:?[0-9]{2})?'; // Z to indicate UTC, -/+HH:MM:SS.SS... for local tz's
+
+                if(ereg($eregStr,$datestr,$regs)){
+                        return sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ',$regs[1],$regs[2],$regs[3],$regs[4],$regs[5],$regs[6]);
+                }
+                return false;
+        } else {
+                return $datestr;
+        }
+}
+
+/* Update status on the user space*/
+function wp_msnsync_getinfo(){
+	global $WP_MSNSYNC_PASSWORD;
+	global $WP_MSNSYNC_URL;
+  $request="    <methodCall>
+    <methodName>blogger.getUsersBlogs</methodName>
+    <params>
+    <param><value><string>ignored value</string></value></param>
+    <param><value><string>".$WP_MSNSYNC_URL."</string></value></param>
+    <param><value><string>".$WP_MSNSYNC_PASSWORD."</string></value></param>
+    </params>
+    </methodCall>";
+	
+	$result=wp_msnsync_docall($request);
+	
+ 	if(preg_match('%<name>faultCode</name><value><int>(.*)</int></value>%', $result, $match))
+ 	{//Error with MSN spaces
+  	$result_array['faultCode']=$match[1];
+  	preg_match('%<name>faultString</name><value><string>(.*)</string></value>%', $result, $match);
+  	$result_array['faultString']=$match[1];
+  }
+  else
+  {//No error
+  	preg_match('%<name>url</name>\s*<value>(.*)</value>%', $result, $match);
+  	$result_array['url']=$match[1];
+  	preg_match('%<name>blogid</name>\s*<value>(.*)</value>%', $result, $match);
+  	$result_array['blogid']=$match[1];
+  	preg_match('%<name>blogName</name>\s*<value>(.*)</value>%', $result, $match);
+  	$result_array['blogName']=$match[1];
+  }
+  
+	return $result_array;
+}
+
+/* Generate Metaweblog post Request */
+function wp_msnsync_genpost($postid, $newpost, $WP_MSNSYNC_IDS){
 	$WP_MSNSYNC_PASSWORD=get_option("wp_msnsync_password");
 	$WP_MSNSYNC_URL=get_option("wp_msnsync_url");
-	$WP_MSNSYNC_ENABLE=get_option("wp_msnsync_enable");
 	$WP_MSNSYNC_MSG=get_option("wp_msnsync_msg");
 	$WP_MSNSYNC_TITLE=get_option("wp_msnsync_title");
 	$WP_MSNSYNC_COOK=get_option("wp_msnsync_cook");
 	$WP_MSNSYNC_PUBLISH=get_option("wp_msnsync_publish");
+	$user_data=get_post($postid);
 
-//priv, do filter or the article may be unformatted
-$post=apply_filters('the_content', $user_data->post_content);
+	//do filter or the post may be unformatted
+	$post=apply_filters('the_content', $user_data->post_content);
 
-//added in version 1.0
-//digest of post support
-$r1=array("[TITLE]","[POST]","[PERMALINK]");
-$r2=array($user_data->post_title,$post, get_permalink($user_data->ID));
-$WP_MSNSYNC_MSG=str_replace($r1,$r2,$WP_MSNSYNC_MSG);
-//priv, add back the title digest support, don't know why orignal author don't want to do this
-$WP_MSNSYNC_TITLE=str_replace($r1, $r2, $WP_MSNSYNC_TITLE);
-
-//In MSN Spaces, <p> doesn't work quite like wordpress, hack it.
-if($WP_MSNSYNC_COOK=="1")
-{
-	$r1=array("<p>", "</p>", "<br />");
-	$r2=array("<DIV>", "</DIV><DIV>&nbsp;</DIV>", "</DIV>\n<DIV>");
+	//added in version 1.0
+	//digest of post support
+	$r1=array("[TITLE]","[POST]","[PERMALINK]");
+	$r2=array($user_data->post_title,$post, get_permalink($postid));
 	$WP_MSNSYNC_MSG=str_replace($r1,$r2,$WP_MSNSYNC_MSG);
-}
-//
-//fix the HTML output problem generated by MSN API
-//added in version 1.0
-//$r1=array("&","<",">");
-//$r2=array("&amp;","&lt;","&gt;");
-//$WP_MSNSYNC_MSG=str_replace($r1,$r2,$WP_MSNSYNC_MSG);
+	$WP_MSNSYNC_TITLE=str_replace($r1, $r2, $WP_MSNSYNC_TITLE);
 
-//use built-in function htmlspecialchars instead
-$WP_MSNSYNC_MSG=htmlspecialchars($WP_MSNSYNC_MSG);
+	//In MSN Spaces, <p> doesn't create a newline, hack it
+	if($WP_MSNSYNC_COOK=="1")
+	{
+		$r1=array("<p>", "</p>");
+		$r2=array("<div>", "</div><br/>");
+		$WP_MSNSYNC_MSG=str_replace($r1,$r2,$WP_MSNSYNC_MSG);
+	}
+	//
+	//fix the HTML output problem generated by MSN API
+	//replace special characters < > &
+	$WP_MSNSYNC_MSG=htmlspecialchars($WP_MSNSYNC_MSG);
 
-//get categories, MSN Spaces only take first category though
-$categories = get_the_category($user_data->ID);
-$the_list = '';
-foreach ($categories as $category) {
-	$category->cat_name = convert_chars($category->cat_name);
-	$the_list .="<data><value><string>$category->cat_name</string></value></data>\n";
-}
+	//get categories, MSN Spaces only take first category though
+	$categories = get_the_category($postid);
+	$the_list = '';
+	foreach ($categories as $category) {
+		$category->cat_name = convert_chars($category->cat_name);
+		$the_list .="<data><value><string>$category->cat_name</string></value></data>\n";
+	}
 
 $output="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <methodCall>
-<methodName>metaWeblog.newPost</methodName>
+<methodName>".($newpost?"metaWeblog.newPost":"metaWeblog.editPost")."</methodName>
 <params>
  <param>
   <value>
-   <string>MyBlog</string>
+   ".($newpost?"<string>MyBlog</string>":"<string>".$WP_MSNSYNC_IDS[$postid]."</string>")."
   </value>
  </param>
  <param>
@@ -160,41 +256,64 @@ $output="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 </params>
 </methodCall>
 ";
-
-	//var_dump($result);
-	
 	return $output;
 }
-//wp_msnsync_genpost();
-/*time generating function*/
-function ig_iso8601_time($utc=true){
-        $datestr = date('Y-m-d\TH:i:sO');
-        if($utc){
-                $eregStr =
-                '([0-9]{4})-'.        // centuries & years CCYY-
-                '([0-9]{2})-'.        // months MM-
-                '([0-9]{2})'.        // days DD
-                'T'.                        // separator T
-                '([0-9]{2}):'.        // hours hh:
-                '([0-9]{2}):'.        // minutes mm:
-                '([0-9]{2})(\.[0-9]*)?'. // seconds ss.ss...
-                '(Z|[+\-][0-9]{2}:?[0-9]{2})?'; // Z to indicate UTC, -/+HH:MM:SS.SS... for local tz's
 
-                if(ereg($eregStr,$datestr,$regs)){
-                        return sprintf('%04d-%02d-%02dT%02d:%02d:%02dZ',$regs[1],$regs[2],$regs[3],$regs[4],$regs[5],$regs[6]);
-                }
-                return false;
-        } else {
-                return $datestr;
-        }
+/*Publishing hook*/
+function wp_msnsync_post($postid){
+	$WP_MSNSYNC_ENABLE=get_option("wp_msnsync_enable");
+	
+	if($WP_MSNSYNC_ENABLE=="1")
+	{//enable
+		$WP_MSNSYNC_IDS=get_option("wp_msnsync_id");
+		
+		//new post or edit
+		if(($WP_MSNSYNC_IDS[$postid]))
+			$newpost=false;
+		else
+			$newpost=true;
+			
+		$request=wp_msnsync_genpost($postid, $newpost, $WP_MSNSYNC_IDS);
+		$result=wp_msnsync_docall($request);
+
+		if(preg_match('%faultCode%', $result, $match))
+		{
+			preg_match('%<int>(.*)</int>%', $result, $match);
+			//if editPost and return 40003 Directory or File Does Not Exist, use newPost instead, try again
+			if($match[1]=="40003")
+			{
+				$newpost=true;
+				$request=wp_msnsync_genpost($postid, $newpost, $WP_MSNSYNC_IDS);
+				$result=wp_msnsync_docall($request);
+			}
+			//TODO, if other fail, how to tell user sync is fail??
+		}
+		//save postid
+		if(preg_match('%<value>(.*)</value>%', $result, $match))
+		{
+			$WP_MSNSYNC_IDS[$postid]=$match[1];
+			update_option("wp_msnsync_id", $WP_MSNSYNC_IDS);
+		}
+	}
+	return $postid;
 }
+
+//if first run, initialize the options
+if (!(get_option('wp_msnsync_enable')))
+	wp_msnsync_init();
 
 /*main action function*/
 function wp_msnsync_display(){
+
 /*First, check action*/
-if($_POST['action']=="options"){
+if(isset($_POST['reset'])){
+	wp_msnsync_reset();
+	echo '<div id="message" class="updated fade"><p>Options reseted.</p></div>';
+}
+else if($_POST['action']=="options"){
 //this means there are new options, save into database
 	wp_msnsync_save();
+	echo '<div id="message" class="updated fade"><p>Options saved.</p></div>';
 }
 
 global $WP_MSNSYNC_PASSWORD;
@@ -213,14 +332,8 @@ $WP_MSNSYNC_TITLE=get_option("wp_msnsync_title");
 $WP_MSNSYNC_COOK=get_option("wp_msnsync_cook");
 $WP_MSNSYNC_PUBLISH=get_option("wp_msnsync_publish");
 
-//
-//wp_msnsync_genpost();
-
 //get info
-global $RPC_VERSION;
-if($RPC_VERSION==1){
-	$response=wp_msnsync_getinfo();
-}
+$response=wp_msnsync_getinfo();
 
 ?>
 <div class="wrap">
@@ -230,32 +343,24 @@ if($RPC_VERSION==1){
 	//this means there is an error
 	?>
 	<div class="wrap">
-	Error: <?php echo $response['faultCode']."|".$response['faultString']?>;
+	Error: <font color="#FF0000"><?php echo $response['faultCode']."|".$response['faultString']?></FONT>;<BR/>
+	Please check your Space Name and Password again, or see if Email Publishing option is turned on on your Live Spaces.
 	</div>
 	<?php
 	}else{
 	/*if there is no error in response, continue parsing*/
 	?>
 	<div class="wrap">
-	<?php if($RPC_VERSION==1){?>
-	Your Space: <a href="<?php echo $response[0]['url'];?>"><?php echo $response[0]['blogName']." ( ".$response[0]['blogid']." )";?></a>
-	</div>
-	<?php }else{?>
-	<div>
-	<font color="red">Your PHP build does not support built-in XML-RPC. Fucntion will be limited</font>
-	<br>
-	You will be able to synchronize (send message to) your msn space, but can not receive response regarding error or other infomation from it.<br>
-	To enable native XMLRPC, please see further the references <a href="http://ca.php.net/manual/en/ref.xmlrpc.php">here</a>
+	Your Space: <a href="<?php echo $response['url'];?>"><?php echo $response['blogName']." ( ".$response['blogid']." )";?></a>
 	</div>
 	<?php
-	}//endif $RPC_VERSION
 	}//if there is no error?>
 	<br>
 	<form name="msnoptions" method="post">
 	<TABLE class=optiontable>
 	<TBODY>
 	<TR vAlign=top>
-	<TH scope=row>Space Name:</TH><td><input name="URL" type="text" size="60" value="<?php echo  $WP_MSNSYNC_URL;?>" /><br />Make sure you enter the space name, not the URL.<br />e.g. "http://spaces.msn.com/abcd" should enter "abcd"</td>
+	<TH scope=row>Space Name:</TH><td><input name="URL" type="text" size="60" value="<?php echo  $WP_MSNSYNC_URL;?>" /><br />Make sure you enter the space name, not the URL.<br />e.g. "http://abcd.spaces.live.com" should enter "abcd"</td>
 	</TR>
 	<tr valign="top">
 	<th scope="row">Password:</th><td> <input name="PASS" type="text" size="60" value="<?php echo  $WP_MSNSYNC_PASSWORD;?>"/><br />This is the secret word you choosed in your MSN space</td></tr>
@@ -312,104 +417,23 @@ if($RPC_VERSION==1){
 	  </tr>
 	  </TBODY>
 	  </TABLE>
-	  	  <div class="wrap">You can use <font color="#7799FF">[TITLE]</font> or <font color="#7799FF">[POST]</font></a> in "Title of Sync" and "Content of Sync".<br>
-	  They will be replaced by the <font color="#7799FF">Title of your new post</font> or <font color="#7799FF">The content of your new post</font><br>
+	  	  <div class="wrap">You can use <font color="#7799FF">[TITLE]</font>/<font color="#7799FF">[POST]</font>/<font color="#7799FF">[PERMALINK]</font> in "Title of Sync" and "Content of Sync".<br>
+	  They will be replaced by the <font color="#7799FF">Title</font>, <font color="#7799FF">content</font>, or <font color="#7799FF">permalink</font> of your post<br>
 	  </div>
 	<input type="hidden" name="action" value="options" />
-	<div align="center"><input value="Save Options" type="submit"/></div>
+	<p class="submit"><input name="reset" value="Reset Options" type="submit"/><input value="Update Options" type="submit"/></p>
 	</form>
-	<div class="wrap" align="right">This plug-in is made by <a href="http://moonblue.homeip.net">William Xu</a> and Modified by priv.</div>
+	<div class="wrap" align="right">This plug-in is created by <a href="http://blog.12thocean.com/">William Xu</a> and Modified by <a href="http://priv.tw/blog">priv</a>.</div>
 </div>
 
 <?php
 }
 
-//move the page to option page
 function wp_msnsync_add_page($s){
 	add_submenu_page('post.php', 'MSN Sync','MSN Sync',1,__FILE__,'wp_msnsync_display');
 	return $s;
 }
 add_action('admin_menu','wp_msnsync_add_page');
-//add_options_page("MSN Sync", "MSN Sync", 1, __FILE__, wp_msnsync_add_page);
-//////////////////////////////////////////////////////////////
-//Main code section 
-//////////////////////////////////////////////////////////////
-function wp_msnsync_save(){
-	//save options into databse
-	update_option("wp_msnsync_url", $_POST['URL']);
-	update_option("wp_msnsync_password", $_POST['PASS']);
-	update_option("wp_msnsync_enable", $_POST['ENABLE']);
-	update_option("wp_msnsync_cook", $_POST['COOK']);
-	update_option("wp_msnsync_publish", $_POST['PUBLISH']);
-	update_option("wp_msnsync_msg",  stripslashes($_POST['SYNCMSG']));
-	update_option("wp_msnsync_title",  stripslashes($_POST['TITLE']));
-}
-
-/* Update status on the user space*/
-function wp_msnsync_getinfo(){
-	global $WP_MSNSYNC_PASSWORD;
-	global $WP_MSNSYNC_URL;
-	
-	$params = array (" ",$WP_MSNSYNC_URL,$WP_MSNSYNC_PASSWORD);
-	$method = "blogger.getUsersBlogs";
-	$request = xmlrpc_encode_request($method,$params);
-	$result=wp_msnsync_docall($request);
-	$result_array=xmlrpc_decode($result);
-	return $result_array;
-}
-/* XML RPC Client*/
-function wp_msnsync_docall($request){
-	$fp = fsockopen("ssl://storage.msn.com", 443, $errno, $errstr);
-	if (!$fp) {
-	  $hd=@fopen("temp.txt",'a');
-	fwrite($hd,"Failed");
-	fclose($hd);
-	} else {
-	$data="";
-	$data.="POST /storageservice/MetaWeblog.rpc  HTTP/1.1\r\n";
-	$data.="Host: storage.msn.com\r\n";
-	$data.="Content-Type: text/xml\r\n";
-	$data.="Content-Length: ".strlen($request)."\r\n";
-	$data.="Accept: */*\r\n\r\n";
-	$data.="$request\r\n\r\n";
-	//
-	fwrite($fp,$data);
-	//
-	
-	$headers = "";
-	do{
-		$str = trim(fgets($fp, 128));
-		$headers .= "$str\n";
-	}while($str!="");
-	
-	
-	/*parse the header for content length*/
-	$header_temp=split("\n",$headers);
-	foreach($header_temp as $value){
-		$temp=split(":",$value);
-		$header_array[$temp[0]]=$temp[1];
-	}
-	if(isset($header_array['Content-Length'])){
-	//if size exist
-		$size=0 + substr($header_array['Content-Length'],1);
-		$body = fread($fp,$size);
-	}else{
-		$body="";
-		while (!feof($fp)) {
-			$line.= fgets($fp);
-
-		} 
-	}
- 
-	return $body;
-	}
-
-}
-
-//version 1.0 experiment
-
 add_action('publish_post','wp_msnsync_post');
-
-
 
 ?>
