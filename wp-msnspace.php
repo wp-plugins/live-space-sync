@@ -4,7 +4,7 @@ Plugin Name: MSN Space Sync 2
 Plugin URI: http://priv.tw/blog/msn-sync-modified/
 Description: A MSN rpc plug-in
 Author: William, priv
-Version: 2.1
+Version: 2.2
 Author URI: http://priv.tw/blog/
 */
 ?>
@@ -18,9 +18,10 @@ $WP_MSNSYNC_TITLE;
 $WP_MSNSYNC_COOK;
 $WP_MSNSYNC_PUBLISH;
 $WP_MSNSYNC_DELETE;
+$WP_MSNSYNC_FULL;
 
 //////////////////////////////////////////////////////////////
-//Main code section 
+//Main code section
 //////////////////////////////////////////////////////////////
 function wp_msnsync_init(){
 	add_option("wp_msnsync_url", 'fill-in-you-space-name');
@@ -29,6 +30,7 @@ function wp_msnsync_init(){
 	add_option("wp_msnsync_cook", '1');
 	add_option("wp_msnsync_publish", '1');
 	add_option("wp_msnsync_delete", '1');
+	add_option("wp_msnsync_full", '1');
 	add_option("wp_msnsync_msg",  '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST]');
 	add_option("wp_msnsync_title",  '[TITLE]');
 	add_option("wp_msnsync_id", '');
@@ -42,6 +44,7 @@ function wp_msnsync_save(){
 	update_option("wp_msnsync_cook", $_POST['COOK']);
 	update_option("wp_msnsync_publish", $_POST['PUBLISH']);
 	update_option("wp_msnsync_delete", $_POST['DELETE']);
+	update_option("wp_msnsync_full",  $_POST['FULL']);
 	update_option("wp_msnsync_msg",  stripslashes($_POST['SYNCMSG']));
 	update_option("wp_msnsync_title",  stripslashes($_POST['TITLE']));
 }
@@ -51,6 +54,7 @@ function wp_msnsync_reset(){
 	update_option("wp_msnsync_cook", '1');
 	update_option("wp_msnsync_publish", '1');
 	update_option("wp_msnsync_delete", '1');
+	update_option("wp_msnsync_full", '1');
 	update_option("wp_msnsync_msg",  '<div>Original URL:<a href=[PERMALINK] title="[TITLE]"> [PERMALINK] </a></div> [POST]');
 	update_option("wp_msnsync_title",  '[TITLE]');
 }
@@ -59,9 +63,7 @@ function wp_msnsync_reset(){
 function wp_msnsync_docall($request){
 	$fp = fsockopen("ssl://storage.msn.com", 443, $errno, $errstr);
 	if (!$fp) {
-	  $hd=@fopen("temp.txt",'a');
-	fwrite($hd,"Failed");
-	fclose($hd);
+	  return 'ConnectionFailed';
 	} else {
 	$data="";
 	$data.="POST /storageservice/MetaWeblog.rpc  HTTP/1.1\r\n";
@@ -73,14 +75,14 @@ function wp_msnsync_docall($request){
 	//
 	fwrite($fp,$data);
 	//
-	
+
 	$headers = "";
 	do{
 		$str = trim(fgets($fp, 128));
 		$headers .= "$str\n";
 	}while($str!="");
-	
-	
+
+
 	/*parse the header for content length*/
 	$header_temp=split("\n",$headers);
 	foreach($header_temp as $value){
@@ -96,9 +98,9 @@ function wp_msnsync_docall($request){
 		while (!feof($fp)) {
 			$line.= fgets($fp);
 
-		} 
+		}
 	}
- 
+
 	return $body;
 	}
 
@@ -139,9 +141,12 @@ function wp_msnsync_getinfo(){
     <param><value><string>".$WP_MSNSYNC_PASSWORD."</string></value></param>
     </params>
     </methodCall>";
-	
+
 	$result=wp_msnsync_docall($request);
-	
+	if(strcmp($result, 'ConnectionFailed') == 0)
+	$result_array['faultCode']='Oops, cannot establish link to Live Spaces';
+	$result_array['faultString']='Try again later';
+
  	if(preg_match('%<name>faultCode</name><value><int>(.*)</int></value>%', $result, $match))
  	{//Error with MSN spaces
   	$result_array['faultCode']=$match[1];
@@ -157,7 +162,7 @@ function wp_msnsync_getinfo(){
   	preg_match('%<name>blogName</name>\s*<value>(.*)</value>%', $result, $match);
   	$result_array['blogName']=$match[1];
   }
-  
+
 	return $result_array;
 }
 
@@ -169,10 +174,19 @@ function wp_msnsync_genpost($postid, $newpost, $WP_MSNSYNC_IDS){
 	$WP_MSNSYNC_TITLE=get_option("wp_msnsync_title");
 	$WP_MSNSYNC_COOK=get_option("wp_msnsync_cook");
 	$WP_MSNSYNC_PUBLISH=get_option("wp_msnsync_publish");
+	$WP_MSNSYNC_FULL=get_option("wp_msnsync_full");
 	$user_data=get_post($postid);
+	$post=$user_data->post_content;
+
+	if($WP_MSNSYNC_FULL!='1')
+	{
+		//cut at <!--more--> tag
+		$pos=strpos($post,"<!--more-->");
+		$post=substr($post,0,$pos);
+	}
 
 	//do filter or the post may be unformatted
-	$post=apply_filters('the_content', $user_data->post_content);
+	$post=apply_filters('the_content', $post);
 
 	//added in version 1.0
 	//digest of post support
@@ -266,24 +280,32 @@ $output="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 /*Publishing hook*/
 function wp_msnsync_post($postid){
 	$WP_MSNSYNC_ENABLE=get_option("wp_msnsync_enable");
-	
+
 	if($WP_MSNSYNC_ENABLE=="1")
 	{//enable
+
+	  //retreive the post content
+	  $user_data=get_post($postid);
+
+		//if contains <!--Stop Sync--> tag, don't sync this post
+		if(strpos($user_data->post_content, '<!--stopsync-->') !== false)
+		    return $postid;
+
 		$WP_MSNSYNC_IDS=get_option("wp_msnsync_id");
-		
+
 		//new post or edit
 		if(($WP_MSNSYNC_IDS[$postid]))
 			$newpost=false;
 		else
 			$newpost=true;
-			
+
 		$request=wp_msnsync_genpost($postid, $newpost, $WP_MSNSYNC_IDS);
 		$result=wp_msnsync_docall($request);
 
-		if(preg_match('%faultCode%', $result, $match))
+		if(strpos($result, 'faultCode') !== false)
 		{
 			preg_match('%<int>(.*)</int>%', $result, $match);
-			//if editPost and return 40003 Directory or File Does Not Exist, use newPost instead, try again
+			//if editPost and return 40003 Directory or File Does Not Exist, try newPost again
 			if($match[1]=="40003")
 			{
 				$newpost=true;
@@ -322,12 +344,12 @@ function wp_msnsync_delete($postid){
     <param><value><boolean>1</boolean></value></param>
     </params>
     </methodCall>";
-    
+
     $result=wp_msnsync_docall($request);
 	}
 	unset($WP_MSNSYNC_IDS[$postid]);
   update_option("wp_msnsync_id", $WP_MSNSYNC_IDS);
-	
+
 	return $postid;
 }
 
@@ -356,6 +378,7 @@ global $WP_MSNSYNC_TITLE;
 global $WP_MSNSYNC_COOK;
 global $WP_MSNSYNC_PUBLISH;
 global $WP_MSNSYNC_DELETE;
+global $WP_MSNSYNC_FULL;
 
 $WP_MSNSYNC_PASSWORD=get_option("wp_msnsync_password");
 $WP_MSNSYNC_URL=get_option("wp_msnsync_url");
@@ -365,6 +388,7 @@ $WP_MSNSYNC_TITLE=get_option("wp_msnsync_title");
 $WP_MSNSYNC_COOK=get_option("wp_msnsync_cook");
 $WP_MSNSYNC_PUBLISH=get_option("wp_msnsync_publish");
 $WP_MSNSYNC_DELETE=get_option("wp_msnsync_delete");
+$WP_MSNSYNC_FULL=get_option("wp_msnsync_full");
 
 //get info
 $response=wp_msnsync_getinfo();
@@ -423,6 +447,14 @@ $response=wp_msnsync_getinfo();
 		</tr>
 		<!-- -->
 	<tr valign="top">
+	<th scope="row">Sync Full Article: </th><td>
+	  <label><input type="radio" name="FULL" value="1" <?php echo $WP_MSNSYNC_FULL?'checked':''; ?>/>Full Article</label>
+	  <label><input type="radio" name="FULL" value="0" <?php echo $WP_MSNSYNC_FULL?'':'checked'; ?>/>Partial</label>
+	  <br />Synchronize full article, or cut at &lt;!--more--&gt;(Please use with proper template)
+		</td>
+		</tr>
+		<!-- -->
+	<tr valign="top">
 	<th scope="row">Enable Cook: </th><td>
 	  <label><input type="radio" name="COOK" value="1" <?php echo $WP_MSNSYNC_COOK?'checked':''; ?>/>Yes</label>
 	  <label><input type="radio" name="COOK" value="0" <?php echo $WP_MSNSYNC_COOK?'':'checked'; ?>/>No</label>
@@ -444,8 +476,9 @@ $response=wp_msnsync_getinfo();
 	  </tr>
 	  </TBODY>
 	  </TABLE>
-	  	  <div class="wrap">You can use <font color="#7799FF">[TITLE]</font>/<font color="#7799FF">[POST]</font>/<font color="#7799FF">[PERMALINK]</font> in "Title of Sync" and "Content of Sync".<br>
+	  	  <div class="wrap">Tips: You can use <font color="#7799FF">[TITLE]</font>/<font color="#7799FF">[POST]</font>/<font color="#7799FF">[PERMALINK]</font> in "Title of Sync" and "Content of Sync".<br>
 	  They will be replaced by the <font color="#7799FF">Title</font>, <font color="#7799FF">content</font>, or <font color="#7799FF">permalink</font> of your post<br>
+	  If you don't want a single post to be synced, add &lt;!--stopsync--&gt; in that article.
 	  </div>
 	<input type="hidden" name="action" value="options" />
 	<p class="submit"><input name="reset" value="Reset Options" type="submit"/><input value="Update Options" type="submit"/></p>
