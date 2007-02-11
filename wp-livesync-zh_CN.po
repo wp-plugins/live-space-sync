@@ -1,0 +1,256 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: wp-livesync\n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: 2007-02-10 19:03+0800\n"
+"Last-Translator: Paveo <sj@owind.com>\n"
+"Language-Team: owind.com <sj@owind.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Poedit-Language: Chinese\n"
+"X-Poedit-Country: CHINA\n"
+"X-Poedit-KeywordsList: _e;__\n"
+"X-Poedit-Basepath: .\n"
+"X-Poedit-SearchPath-0: .\n"
+
+#: wp-livesync.php:146
+msgid "Oops, cannot establish link to Live Spaces"
+msgstr "噢，无法连接到 Live Space"
+
+#: wp-livesync.php:147
+msgid "Try again later"
+msgstr "再试试看"
+
+#: wp-livesync.php:394
+msgid "Options reseted."
+msgstr "选项被重置。"
+
+#: wp-livesync.php:399
+msgid "Options saved."
+msgstr "选项被更新。"
+
+#: wp-livesync.php:433
+#: wp-livesync.php:548
+#: wp-livesync.php:549
+msgid "Live Sync"
+msgstr "Live 同步"
+
+#: wp-livesync.php:440
+msgid "Error:"
+msgstr "错误："
+
+#: wp-livesync.php:440
+msgid ";"
+msgstr "。"
+
+#: wp-livesync.php:441
+msgid "Please check your Space Name and Password again, or see if Email Publishing option is turned on on your Live Spaces."
+msgstr "请检查您的 Space 用户名和密码，或者您的  Live Spaces 选项中关闭了 Email Publish 。"
+
+#: wp-livesync.php:448
+msgid "Your Space:"
+msgstr "您的 Space："
+
+#: wp-livesync.php:449
+msgid "Seems your settings are correct,"
+msgstr "看上去设置正确，"
+
+#: wp-livesync.php:449
+msgid "and the plug-in is ready to sync post for you."
+msgstr "插件已准备好为您同步文章。"
+
+#: wp-livesync.php:449
+msgid "but your post sync is disabled."
+msgstr "但是您禁止了文章同步。"
+
+#: wp-livesync.php:457
+msgid "Connections:"
+msgstr "连接："
+
+#: wp-livesync.php:458
+msgid "Post sync is"
+msgstr "文章同步："
+
+#: wp-livesync.php:458
+msgid "Enabled"
+msgstr "开启"
+
+#: wp-livesync.php:458
+msgid "Disabled"
+msgstr "关闭"
+
+#: wp-livesync.php:459
+msgid "Disable it"
+msgstr "关闭它"
+
+#: wp-livesync.php:459
+msgid "Enable it"
+msgstr "开启它"
+
+#: wp-livesync.php:462
+msgid "Space Name:"
+msgstr "Space 名称："
+
+#: wp-livesync.php:462
+msgid "$WP_MSNSYNC_URL"
+msgstr "输入您的空间名"
+
+#: wp-livesync.php:462
+msgid "Make sure you enter the space name, not the URL.<br />e.g. \"http://abcd.spaces.live.com\" should enter \"abcd\""
+msgstr "请输入您的 Space 名称，而不是 URL。<br />例如： “http://abcd.spaces.live.com” 的 URL 您该输入 “abcd”"
+
+#: wp-livesync.php:465
+msgid "Password:"
+msgstr "密码："
+
+#: wp-livesync.php:465
+msgid "$WP_MSNSYNC_PASSWORD"
+msgstr "输入您的密码"
+
+#: wp-livesync.php:465
+msgid "This is the secret word you choosed in your MSN space"
+msgstr "这是您在 MSN space 中选择的 secret word"
+
+#: wp-livesync.php:468
+msgid "Sync Delete:"
+msgstr "同步删除："
+
+#: wp-livesync.php:469
+#: wp-livesync.php:494
+msgid "Yes"
+msgstr "是"
+
+#: wp-livesync.php:470
+#: wp-livesync.php:495
+msgid "No"
+msgstr "否"
+
+#: wp-livesync.php:471
+msgid "When delete post, delete post on Live Spaces as well(will be inactive when Enable Sync set to No)."
+msgstr "当删除文章时，同步删除在  Live Spaces 上的文章(当文章同步被关闭时该功能无效)。"
+
+#: wp-livesync.php:476
+msgid "Post Status:"
+msgstr "文章状态："
+
+#: wp-livesync.php:477
+msgid "Published"
+msgstr "已出版"
+
+#: wp-livesync.php:478
+msgid "Draft"
+msgstr "草稿"
+
+#: wp-livesync.php:479
+msgid "Set the status that the synchronized post will appear in MSN spaces."
+msgstr "设置文章状态以使同步的文章出现在 MSN spaces 。"
+
+#: wp-livesync.php:483
+msgid "Formatting"
+msgstr "格式化："
+
+#: wp-livesync.php:485
+msgid "Sync Text:"
+msgstr "同步文字："
+
+#: wp-livesync.php:486
+msgid "Always Full Text"
+msgstr "全文"
+
+#: wp-livesync.php:487
+msgid "Cut at &lt;!--more--&gt;"
+msgstr "从 &lt;!--more--&gt; 截断"
+
+#: wp-livesync.php:488
+msgid "Always synchronize full text, or cut at &lt;!--more--&gt;"
+msgstr "总是同步全文或者从 &lt;!--more--&gt; 截断"
+
+#: wp-livesync.php:493
+msgid "Enable Cook:"
+msgstr "允许 p2d 魔法："
+
+#: wp-livesync.php:496
+msgid "When set to \"Yes\", convert \"&lt;p&gt;\" tags to \"&lt;div&gt;\" formatters, to be better viewed with live spaces."
+msgstr "选择 “是” 将在文章同步时自动转换 \"&lt;p&gt;\" 标签为 \"&lt;div&gt;\" 标签，这将使您的文章在  live spaces 上更好看。"
+
+#: wp-livesync.php:501
+msgid "Title of Sync:"
+msgstr "同步标题："
+
+#: wp-livesync.php:501
+msgid "This will appear to be the title of the synchronization post"
+msgstr "这将成为标题在您的同步文章中"
+
+#: wp-livesync.php:505
+msgid "Content of Sync:"
+msgstr "同步内容："
+
+#: wp-livesync.php:509
+msgid "This will be the content of sync when fulltext is synchronized."
+msgstr "这将是文章内容当全文被同步发生时。"
+
+#: wp-livesync.php:513
+msgid "Content of Sync"
+msgstr "同步内容"
+
+#: wp-livesync.php:513
+msgid "(For Partial Article):"
+msgstr "(特殊定制文章)："
+
+#: wp-livesync.php:515
+msgid "This will be the content of sync when 'Sync Text' is set to 'Cut at &lt;!--more--&gt;' and the article contains &lt;!--more--&gt;."
+msgstr "同步时，这将是文章内容，如果您的 “同步文字” 选项设置成 “从 &lt;!--more--&gt; 截断” 并当文章包含 &lt;!--more--&gt; 标签的话。"
+
+#: wp-livesync.php:519
+msgid "Tips: You can use"
+msgstr "提示：您可以使用"
+
+#: wp-livesync.php:519
+msgid "in \"Title of Sync\" and \"Content of Sync\"."
+msgstr "在 “同步标题” 和 “同步内容” 中。"
+
+#: wp-livesync.php:520
+msgid "They will be replaced by the"
+msgstr "这些会被"
+
+#: wp-livesync.php:520
+msgid "or"
+msgstr "或"
+
+#: wp-livesync.php:520
+msgid "of your post"
+msgstr "替换在您的文章中。"
+
+#: wp-livesync.php:521
+msgid "If you don't want a single post to be synced, add &lt;!--stopsync--&gt; in that article."
+msgstr "如果您想让一篇文章不被同步，在文章中添加 &lt;!--stopsync--&gt; 标签。"
+
+#: wp-livesync.php:524
+msgid "Excluded Categories"
+msgstr "排除这些分类目录"
+
+#: wp-livesync.php:525
+msgid "Select the categories that you don't want them to be synchronized."
+msgstr "选择您不想被同步的分类目录。"
+
+#: wp-livesync.php:539
+msgid "Sync All existing Posts"
+msgstr "同步全部文章"
+
+#: wp-livesync.php:539
+msgid "Restore Default Options"
+msgstr "重置默认选项"
+
+#: wp-livesync.php:539
+msgid "Update Options"
+msgstr "更新选项"
+
+#: wp-livesync.php:541
+msgid "This plug-in was originally created by"
+msgstr "该插件原始作者是"
+
+#: wp-livesync.php:541
+msgid "and heavily modified by"
+msgstr "重大修改者为"
+

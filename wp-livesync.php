@@ -7,8 +7,17 @@ Author: William, priv
 Version: 1.0
 Author URI: http://privism.org/blog/
 */
+
+// ADD line 368 AND post_password=''
+
 ?>
+
+
+		
 <?php
+
+load_plugin_textdomain('wp-livesync',PLUGINDIR.'/wp-livesync');
+$pl_domain = 'wp-livesync';
 
 $WP_MSNSYNC_PASSWORD;
 $WP_MSNSYNC_URL;
@@ -76,7 +85,8 @@ function wp_msnsync_reset(){
 
 /* XML RPC Client*/
 function wp_msnsync_docall($request){
-	$fp = fsockopen("ssl://storage.msn.com", 443, $errno, $errstr);
+	$fp = @fsockopen("ssl://storage.msn.com", 443, $errno, $errstr);
+	// I put a "@" avoid the error message display when the internet connection drop. -Paveo
 	if (!$fp) {
 	  return 'ConnectionFailed';
 	} else {
@@ -133,8 +143,8 @@ function wp_msnsync_getinfo(){
 
 	$result=wp_msnsync_docall($request);
 	if(strcmp($result, 'ConnectionFailed') == 0)
-	$result_array['faultCode']='Oops, cannot establish link to Live Spaces';
-	$result_array['faultString']='Try again later';
+	$result_array['faultCode']=__('Oops, cannot establish link to Live Spaces','wp-livesync');
+	$result_array['faultString']=__('Try again later','wp-livesync');
 
  	if(preg_match('%<name>faultCode</name><value><int>(.*)</int></value>%', $result, $match))
  	{//Error with MSN spaces
@@ -360,7 +370,7 @@ function wp_msnsync_delete($postid){
 
 function wp_msnsync_syncall(){
   global $wpdb;
-  $posts = $wpdb->get_results("SELECT ID FROM $wpdb->posts WHERE post_status = 'publish' AND post_type='post' ORDER BY post_date");
+  $posts = $wpdb->get_results("SELECT ID FROM $wpdb->posts WHERE post_status = 'publish' AND post_type='post' AND post_password='' ORDER BY post_date");
   if($posts)
     foreach ($posts as $post)
       wp_msnsync_post($post->ID);
@@ -381,12 +391,12 @@ else if(isset($_POST['enablebutton'])){
 }
 else if(isset($_POST['reset'])){
 	wp_msnsync_reset();
-	echo '<div id="message" class="updated fade"><p>Options reseted.</p></div>';
+	echo '<div id="message" class="updated fade"><p>'.__('Options reseted.','wp-livesync').'</p></div>';
 }
 else if($_POST['action']=="options"){
 //this means there are new options, save into database
 	wp_msnsync_save();
-	echo '<div id="message" class="updated fade"><p>Options saved.</p></div>';
+	echo '<div id="message" class="updated fade"><p>'.__('Options saved.','wp-livesync').'</p></div>';
 }
 
 global $WP_MSNSYNC_PASSWORD;
@@ -420,23 +430,23 @@ $response=wp_msnsync_getinfo();
 
 ?>
 <div class="wrap">
-	<h2>Live Sync</h2>
+	<h2><?php echo __('Live Sync','wp-livesync');?></h2>
 
 	<?php
 	if(isset($response['faultCode'])){
 	//this means there is an error
 	?>
 	<div class="wrap">
-	Error: <font color="#FF0000"><?php echo $response['faultCode']."|".$response['faultString']?></FONT>;<BR/>
-	Please check your Space Name and Password again, or see if Email Publishing option is turned on on your Live Spaces.
+	<?php _e('Error:','wp-livesync') ?><font color="#FF0000"><?php echo $response['faultCode'].'|'.$response['faultString']?></FONT><?php _e(';','wp-livesync') ?><BR/>
+	<?php echo __('Please check your Space Name and Password again, or see if Email Publishing option is turned on on your Live Spaces.','wp-livesync');?>
 	</div>
 	<?php
 	}else{
 	/*if there is no error in response, continue parsing*/
 	?>
 	<div class="wrap">
-	Your Space: <a href="<?php echo $response['url'];?>"><?php echo $response['blogName']." ( ".$response['blogid']." )";?></a>
-	<br />Seems your settings are correct, <?php echo $WP_MSNSYNC_ENABLE?'and the plug-in is ready to sync post for you.':'but your post sync is disabled.'?>
+	<?php _e('Your Space:','wp-livesync');?> <a href="<?php echo $response['url'];?>"><?php echo $response['blogName']." ( ".$response['blogid']." )";?></a>
+	<br /><?php _e('Seems your settings are correct,','wp-livesync');?> <?php echo $WP_MSNSYNC_ENABLE ? _e('and the plug-in is ready to sync post for you.','wp-livesync') : _e('but your post sync is disabled.','wp-livesync');?>
 	</div>
 	<?php
 	}//if there is no error?>
@@ -444,75 +454,75 @@ $response=wp_msnsync_getinfo();
 	<form name="msnoptions" method="post" action="<?php echo $_SERVER["REQUEST_URI"]?>">
 	<table class="optiontable">
 	<tbody>
-	<tr><th><h2>Connections:</h2></th></tr>
-	 <tr><th>Post sync is <?php echo $WP_MSNSYNC_ENABLE?'Enabled':'Disabled'?></th>
-	  <td><input type="submit" name="enablebutton" value="<?php echo $WP_MSNSYNC_ENABLE?'Disable it':'Enable it'?>" /></td>
+	<tr><th><h2><?php _e('Connections:','wp-livesync');?></h2></th></tr>
+	 <tr><th><?php _e('Post sync is','wp-livesync');?> <?php echo $WP_MSNSYNC_ENABLE ? __('Enabled','wp-livesync'):__('Disabled','wp-livesync')?></th>
+	  <td><input type="submit" name="enablebutton" value="<?php echo $WP_MSNSYNC_ENABLE ? __('Disable it','wp-livesync') : __('Enable it','wp-livesync')?>" /></td>
 	</tr>
 	<tr valign="top">
-	<th scope="row">Space Name:</th><td><input name="URL" type="text" size="60" value="<?php echo  $WP_MSNSYNC_URL;?>" /><br />Make sure you enter the space name, not the URL.<br />e.g. "http://abcd.spaces.live.com" should enter "abcd"</td>
+	<th scope="row"><?php _e('Space Name:','wp-livesync') ?></th><td><input name="URL" type="text" size="60" value="<?php echo  __('$WP_MSNSYNC_URL','wp-livesync'); ?>" /><br /><?php _e('Make sure you enter the space name, not the URL.<br />e.g. "http://abcd.spaces.live.com" should enter "abcd"','wp-livesync') ?></td>
 	</tr>
 	<tr valign="top">
-	<th scope="row">Password:</th><td> <input name="PASS" type="text" size="60" value="<?php echo  $WP_MSNSYNC_PASSWORD;?>"/><br />This is the secret word you choosed in your MSN space</td></tr>
+	<th scope="row"><?php _e('Password:','wp-livesync') ?></th><td> <input name="PASS" type="text" size="60" value="<?php echo  __('$WP_MSNSYNC_PASSWORD','wp-livesync'); ?>"/><br /><?php _e('This is the secret word you choosed in your MSN space','wp-livesync') ?></td></tr>
 		<!-- -->
 	<tr valign="top">
-	<th scope="row">Sync Delete: </th><td>
-	  <label><input type="radio" name="DELETE" value="1" <?php echo $WP_MSNSYNC_DELETE?'checked="checked"':''; ?>/>Yes</label>
-	  <label><input type="radio" name="DELETE" value="0" <?php echo $WP_MSNSYNC_DELETE?'':'checked="checked"'; ?>/>No</label>
-	  <br />When delete post, delete post on Live Spaces as well(will be inactive when Enable Sync set to No).
+	<th scope="row"><?php _e('Sync Delete:','wp-livesync') ?> </th><td>
+	  <label><input type="radio" name="DELETE" value="1" <?php echo $WP_MSNSYNC_DELETE ? 'checked="checked"':''; ?>/><?php _e('Yes','wp-livesync') ?></label>
+	  <label><input type="radio" name="DELETE" value="0" <?php echo $WP_MSNSYNC_DELETE?'':'checked="checked"'; ?>/><?php _e('No','wp-livesync') ?></label>
+	  <br /><?php _e('When delete post, delete post on Live Spaces as well(will be inactive when Enable Sync set to No).','wp-livesync') ?>
 		</td>
 		</tr>
 		<!-- -->
 	<tr valign="top">
-	<th scope="row">Post Status: </th><td>
-	  <label><input type="radio" name="PUBLISH" value="1" <?php echo $WP_MSNSYNC_PUBLISH?'checked="checked"':''; ?>/>Published</label>
-	  <label><input type="radio" name="PUBLISH" value="0" <?php echo $WP_MSNSYNC_PUBLISH?'':'checked="checked"'; ?>/>Draft</label>
-	  <br />Set the status that the synchronized post will appear in MSN spaces.
+	<th scope="row"><?php _e('Post Status:','wp-livesync') ?> </th><td>
+	  <label><input type="radio" name="PUBLISH" value="1" <?php echo $WP_MSNSYNC_PUBLISH?'checked="checked"':''; ?>/><?php _e('Published','wp-livesync') ?></label>
+	  <label><input type="radio" name="PUBLISH" value="0" <?php echo $WP_MSNSYNC_PUBLISH?'':'checked="checked"'; ?>/><?php _e('Draft','wp-livesync') ?></label>
+	  <br /><?php _e('Set the status that the synchronized post will appear in MSN spaces.','wp-livesync') ?>
 		</td>
 		</tr>
 		<!-- -->
-	<tr><th><h2>Formatting</h2></th></tr>
+	<tr><th><h2><?php _e('Formatting','wp-livesync') ?></h2></th></tr>
 	<tr valign="top">
-	<th scope="row">Sync Text: </th><td>
-	  <label><input type="radio" name="FULL" value="1" <?php echo $WP_MSNSYNC_FULL?'checked="checked"':''; ?>/>Always Full Text</label>
-	  <label><input type="radio" name="FULL" value="0" <?php echo $WP_MSNSYNC_FULL?'':'checked="checked"'; ?>/>Cut at &lt;!--more--&gt;</label>
-	  <br />Always synchronize full text, or cut at &lt;!--more--&gt;
-		</td>
-		</tr>
-		<!-- -->
-	<tr valign="top">
-	<th scope="row">Enable Cook: </th><td>
-	  <label><input type="radio" name="COOK" value="1" <?php echo $WP_MSNSYNC_COOK?'checked="checked"':''; ?>/>Yes</label>
-	  <label><input type="radio" name="COOK" value="0" <?php echo $WP_MSNSYNC_COOK?'':'checked="checked"'; ?>/>No</label>
-	  <br />When set to "Yes", convert "&lt;p&gt;" tags to "&lt;div&gt;" formatters, to be better viewed with live spaces.
+	<th scope="row"><?php _e('Sync Text:','wp-livesync') ?> </th><td>
+	  <label><input type="radio" name="FULL" value="1" <?php echo $WP_MSNSYNC_FULL?'checked="checked"':''; ?>/><?php _e('Always Full Text','wp-livesync') ?></label>
+	  <label><input type="radio" name="FULL" value="0" <?php echo $WP_MSNSYNC_FULL?'':'checked="checked"'; ?>/><?php _e('Cut at &lt;!--more--&gt;','wp-livesync') ?></label>
+	  <br /><?php _e('Always synchronize full text, or cut at &lt;!--more--&gt;','wp-livesync') ?>
 		</td>
 		</tr>
 		<!-- -->
 	<tr valign="top">
-	<th scope="row">Title of Sync:</th><td> <input name="TITLE" type="text" size="60" value="<?php echo htmlspecialchars($WP_MSNSYNC_TITLE);?>"/><br />This will appear to be the title of the synchronization post</td></tr>
+	<th scope="row"><?php _e('Enable Cook:','wp-livesync') ?> </th><td>
+	  <label><input type="radio" name="COOK" value="1" <?php echo $WP_MSNSYNC_COOK?'checked="checked"':''; ?>/><?php _e('Yes','wp-livesync') ?></label>
+	  <label><input type="radio" name="COOK" value="0" <?php echo $WP_MSNSYNC_COOK?'':'checked="checked"'; ?>/><?php _e('No','wp-livesync') ?></label>
+	  <br /><?php _e('When set to "Yes", convert "&lt;p&gt;" tags to "&lt;div&gt;" formatters, to be better viewed with live spaces.','wp-livesync') ?>
+		</td>
+		</tr>
+		<!-- -->
+	<tr valign="top">
+	<th scope="row"><?php _e('Title of Sync:','wp-livesync') ?></th><td> <input name="TITLE" type="text" size="60" value="<?php echo htmlspecialchars($WP_MSNSYNC_TITLE);?>"/><br /><?php _e('This will appear to be the title of the synchronization post','wp-livesync') ?></td></tr>
 
 	<tr valign="top">
 	<th scope="row">
-	  Content of Sync:
+	  <?php _e('Content of Sync:','wp-livesync') ?>
   </th>
   <td>
 	  <textarea name="SYNCMSG" cols="60" rows="4"><?php echo htmlspecialchars($WP_MSNSYNC_MSG);?></textarea>
-		<br /> This will be the content of sync when fulltext is synchronized.
+		<br /> <?php _e('This will be the content of sync when fulltext is synchronized.','wp-livesync') ?>
 	  </td>
 	  </tr>
 	  	<tr valign="top">
-	<th scope="row">Content of Sync<br/>(For Partial Article):</th><td>
+	<th scope="row"><?php _e('Content of Sync','wp-livesync') ?><br/><?php _e('(For Partial Article):','wp-livesync') ?></th><td>
 		<textarea name="MOREMSG" cols="60" rows="4"><?php echo htmlspecialchars($WP_MSNSYNC_MORE);?></textarea>
-		<br /> This will be the content of sync when 'Sync Text' is set to 'Cut at &lt;!--more--&gt;' and the article contains &lt;!--more--&gt;.
+		<br /> <?php _e('This will be the content of sync when \'Sync Text\' is set to \'Cut at &lt;!--more--&gt;\' and the article contains &lt;!--more--&gt;.','wp-livesync') ?>
 		</td></tr>
 	  </tbody>
 	  </table>
-	  	  <div class="wrap">Tips: You can use <font color="#7799FF">[TITLE]</font>/<font color="#7799FF">[POST]</font>/<font color="#7799FF">[PERMALINK]</font> in "Title of Sync" and "Content of Sync".<br />
-	  They will be replaced by the <font color="#7799FF">title</font>, <font color="#7799FF">content</font>, or <font color="#7799FF">permalink</font> of your post<br />
-	  If you don't want a single post to be synced, add &lt;!--stopsync--&gt; in that article.
+	  	  <div class="wrap"><?php _e('Tips: You can use','wp-livesync') ?> <font color="#7799FF">[TITLE]</font>/<font color="#7799FF">[POST]</font>/<font color="#7799FF">[PERMALINK]</font> <?php _e('in "Title of Sync" and "Content of Sync".','wp-livesync') ?><br />
+	  <?php _e('They will be replaced by the','wp-livesync') ?> <font color="#7799FF">title</font>, <font color="#7799FF">content</font>, <?php _e('or','wp-livesync') ?> <font color="#7799FF">permalink</font> <?php _e('of your post','wp-livesync') ?><br />
+	   <?php _e('If you don\'t want a single post to be synced, add &lt;!--stopsync--&gt; in that article.','wp-livesync') ?>
 	  </div>
 	  <div class="wrap">
-	  <h2>Excluded Categories</h2>
-	  Select the categories that you don't want them to be synchronized.<br/>
+	  <h2><?php _e('Excluded Categories','wp-livesync') ?></h2>
+	  <?php _e('Select the categories that you don\'t want them to be synchronized.','wp-livesync') ?><br/>
 	  <?php
 	  if ($categories)
 		foreach ($categories as $category) {
@@ -526,17 +536,17 @@ $response=wp_msnsync_getinfo();
 		}?>
 	</div>
 	<input type="hidden" name="action" value="options" />
-	<p class="submit"><input name="syncall" value="Sync All existing Posts" type="submit"/><input name="reset" value="Restore Default Options" type="submit"/><input value="Update Options" type="submit"/></p>
+	<p class="submit"><input name="syncall" value="<?php _e('Sync All existing Posts','wp-livesync') ?>" type="submit" /><input name="reset" value="<?php _e('Restore Default Options','wp-livesync') ?>" type="submit" /><input value="<?php _e('Update Options','wp-livesync') ?>" type="submit" /></p>
 	</form>
-	<div class="wrap" align="right">This plug-in was originally created by <a href="http://blog.12thocean.com/">William Xu</a> and heavily modified by <a href="http://priv.tw/blog">priv</a>.</div>
+	<div class="wrap" align="right"><?php _e('This plug-in was originally created by','wp-livesync') ?> <a href="http://blog.12thocean.com/">William Xu</a> <?php _e('and heavily modified by','wp-livesync') ?> <a href="http://priv.tw/blog">priv</a>.</div>
 </div>
 
 <?php
 }
 
 function wp_msnsync_add_page($s){
-	add_submenu_page('post.php', 'Live Sync','Live Sync',1,__FILE__,'wp_msnsync_display');
-	add_options_page('Live Sync', 'Live Sync',1,__FILE__,'wp_msnsync_display');
+	add_submenu_page('post.php', __('Live Sync','wp-livesync'),__('Live Sync','wp-livesync'),1,__FILE__,'wp_msnsync_display');
+	add_options_page(__('Live Sync','wp-livesync'), __('Live Sync','wp-livesync'),1,__FILE__,'wp_msnsync_display');
 	return $s;
 }
 add_action('admin_menu','wp_msnsync_add_page');
