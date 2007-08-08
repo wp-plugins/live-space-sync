@@ -535,8 +535,8 @@ $response=wp_msnsync_getinfo();
 }
 
 function wp_msnsync_add_page($s){
-	add_submenu_page('post.php', 'Live Sync','Live Sync',1,__FILE__,'wp_msnsync_display');
-	add_options_page('Live Sync', 'Live Sync',1,__FILE__,'wp_msnsync_display');
+	add_submenu_page('post.php', 'Live Sync','Live Sync',8,__FILE__,'wp_msnsync_display');
+	add_options_page('Live Sync', 'Live Sync',8,__FILE__,'wp_msnsync_display');
 	return $s;
 }
 add_action('admin_menu','wp_msnsync_add_page');
