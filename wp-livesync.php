@@ -4,7 +4,7 @@ Plugin Name: Live Space Sync
 Plugin URI: http://privism.org/blog/live-sync/
 Description: A Live Spaces rpc plug-in
 Author: William, priv
-Version: 1.0
+Version: 1.01
 Author URI: http://privism.org/blog/
 */
 ?>
@@ -413,7 +413,7 @@ $WP_MSNSYNC_DELETE=get_option("wp_msnsync_delete");
 $WP_MSNSYNC_FULL=get_option("wp_msnsync_full");
 $WP_MSNSYNC_MORE=get_option("wp_msnsync_more");
 $WP_MSNSYNC_EXCLUDE = get_option("wp_msnsync_exclude");
-$categories = $wpdb->get_results("SELECT * FROM $wpdb->categories ORDER BY cat_name");
+$categories = $categories = (array) get_categories('get=all');
 
 //get info
 $response=wp_msnsync_getinfo();

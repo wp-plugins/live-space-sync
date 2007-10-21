@@ -1,5 +1,10 @@
 Live Sync 1.0
+1.01
+Fix:
+  * Fix Wordpress 2.3 compatibility
+  * Only blog administrators see the config page
 
+1.0
  New:
   * Add exclude catgories option
   * Sync-all-posts-at-once button
